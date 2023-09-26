@@ -3,10 +3,9 @@ from os import getenv
 import logging
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
-from aiogram.utils import formatting
 
 from db import init, close_connections
 
@@ -26,15 +25,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
     await message.answer('Придумай название для команды')
 
 
-@root.message(Command('me'))
-async def cmd_me(message: types.Message, state: FSMContext):
-    content = formatting.as_marked_list(
-        formatting.as_key_value('Состояние', await state.get_state()),
-        formatting.as_key_value('Данные', await state.get_data()),
-    )
-    await message.answer(**content.as_kwargs())
-
-
 dp = Dispatcher(storage=MemoryStorage())
 dp.include_routers(root, teams, admin)
 
@@ -44,8 +34,6 @@ async def main() -> None:
     try:
         await init()
         await dp.start_polling(bot)
-    except KeyboardInterrupt:
-        pass
     finally:
         await close_connections()
 
