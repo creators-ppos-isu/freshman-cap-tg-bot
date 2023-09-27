@@ -1,12 +1,14 @@
 import logging
+from typing import Dict, Any, Callable, Awaitable
 
+import tortoise.exceptions
 from aiogram import Router, F
 from aiogram.types import (
     Message,
-    CallbackQuery
+    CallbackQuery, Update, ErrorEvent
 )
-from aiogram.utils.formatting import as_list
-from aiogram.filters import Command, CommandObject
+from aiogram.utils.formatting import as_list, as_key_value
+from aiogram.filters import Command, CommandObject, ExceptionTypeFilter
 
 from .keyboards import AddScoreCallback
 from teams.models import Team, Station, TeamScoreHistory
@@ -15,16 +17,55 @@ from teams.router import send_current_station_for
 admin = Router()
 
 
+class AccessDenied(Exception):
+    pass
+
+
+@admin.message.middleware()
+async def check_admin(
+        handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
+        event: Update,
+        data: Dict[str, Any]
+):
+    if event.from_user.id not in {596546865}:
+        raise AccessDenied()
+    return await handler(event, data)
+
+
+@admin.error(ExceptionTypeFilter(AccessDenied), F.update.message.as_('message'))
+async def handle_access_denied(event: ErrorEvent, message: Message):
+    await message.answer('У Вас недостаточно прав для доступа к этим функциям')
+
+
 @admin.message(Command('teams'))
 async def cmd_team(message: Message):
     teams = await Team.all()
-    content = as_list(*teams)
+    content = as_list(*[
+        as_list(
+            as_key_value('ID', team.id),
+            as_key_value('Подразделение', team.division),
+            as_key_value('Название', team.name),
+            as_key_value('Баллы', team.score),
+            as_key_value('Пройдено станций', team.progress),
+        ) for team in teams], sep='\n\n')
     await message.answer(**content.as_kwargs())
 
 
-@admin.message(F.photo)
-async def get_photo_id(message: Message):
-    await message.answer(f'<code>{ message.photo[0].file_id }</code>')
+@admin.message(F.photo & F.caption.regexp(r'\d+'))
+async def upload_station_image(message: Message):
+    try:
+        station_id = int(message.caption)
+
+        station = await Station.get(id=station_id)
+        photo_id = message.photo[0].file_id
+        station.image = photo_id
+        await station.save()
+
+        logging.warning(f'Image for station {station.id} uploaded by {message.from_user.id}')
+        await message.reply(f'Фотография для станции <b>{station.name}</b> успешно обновлена')
+
+    except tortoise.exceptions.DoesNotExist:
+        await message.reply('Станция с данным ID не найдена')
 
 
 @admin.message(Command('start_route'))

@@ -12,7 +12,7 @@ class Team(Model):
     score = fields.IntField(default=0)
 
     def __str__(self):
-        return f'<{self.id}> {self.name} ({self.division}) [{self.progress}/{len(ROUTES[0])}]'
+        return f'Team {self.id}: {self.name}'
 
     async def get_current_station(self):
         station_id = ROUTES[self.id - 1][self.progress]

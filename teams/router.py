@@ -4,14 +4,15 @@ import tortoise.exceptions
 from aiogram import Router, F
 from aiogram.types import (
     Message,
-    CallbackQuery, ErrorEvent, InlineKeyboardMarkup, InlineKeyboardButton,
+    CallbackQuery, ErrorEvent
 )
 from aiogram.filters import Command, ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import formatting
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from tortoise.exceptions import ValidationError
 
-from settings import DIVISIONS
+from settings import DIVISIONS, ROUTES
 from .keyboards import TeamInPlaceCallback, DivisionCallback
 from .states import TeamReg
 from .models import Team, Station
@@ -31,7 +32,7 @@ async def process_team_division(query: CallbackQuery, callback_data: DivisionCal
 async def process_team_name(message: Message, state: FSMContext):
     data = await state.get_data()
     try:
-        await Team.update_or_create(
+        team = await Team.create(
             leader=message.from_user.id,
             division=data['division'],
             defaults=dict(
@@ -43,31 +44,37 @@ async def process_team_name(message: Message, state: FSMContext):
         return await message.reply('Неверный формат названия команды: максимальная длина - 32 символа')
 
     await message.answer('Спасибо, я запомнил!')
-    logging.info(f'Registered new team from {data["division"]} with name {message.text}, leader id: {message.from_user.id}')
+    logging.info(f'Registered {team}')
     await state.clear()
 
 
-async def send_current_station_for(team: Team, message: Message) -> Station:
-    station = await team.get_current_station()
+async def send_current_station_for(team: Team, message: Message):
+    try:
+        station = await team.get_current_station()
+    except tortoise.exceptions.DoesNotExist:
+        station_id = ROUTES[team.id - 1][team.progress]
+        return await message.answer(f'Станция {station_id} не найдена в системе!')
 
-    content = formatting.as_list(
-        formatting.Bold(station.name),
-        formatting.as_key_value('📍', station.place),
-    )
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text='Мы на месте!',
-                callback_data=TeamInPlaceCallback().pack())
-        ]
-    ])
-    await message.bot.send_message(
-        chat_id=team.leader,
-        **content.as_kwargs(),
-        reply_markup=keyboard
-    )
+    text = \
+        f'<b>{station.name}</b>' \
+        f'\n📍 {station.place}'
 
-    return station
+    builder = InlineKeyboardBuilder()
+    builder.button(text='Мы на месте', callback_data=TeamInPlaceCallback())
+
+    if station.image is None:
+        await message.bot.send_message(
+            chat_id=team.leader,
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.bot.send_photo(
+            chat_id=team.leader,
+            photo=station.image,
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
 
 
 @teams.callback_query(TeamInPlaceCallback.filter())
