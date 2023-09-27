@@ -12,7 +12,7 @@ class Team(Model):
     score = fields.IntField(default=0)
 
     def __str__(self):
-        return f'{self.id}: {self.name} [{self.progress}/{len(ROUTES[0])}]'
+        return f'<{self.id}> {self.name} ({self.division}) [{self.progress}/{len(ROUTES[0])}]'
 
     async def get_current_station(self):
         station_id = ROUTES[self.id - 1][self.progress]
@@ -25,3 +25,9 @@ class Station(Model):
     place = fields.CharField(max_length=64)
     image = fields.CharField(max_length=256, null=True)
     moderator = fields.IntField()
+
+
+class TeamScoreHistory(Model):
+    station = fields.ForeignKeyField('teams.Station', related_name='score-history', on_delete=fields.CASCADE)
+    team = fields.ForeignKeyField('teams.Team', related_name='score-history', on_delete=fields.CASCADE)
+    score = fields.SmallIntField()

@@ -9,7 +9,7 @@ from aiogram.utils.formatting import as_list
 from aiogram.filters import Command, CommandObject
 
 from .keyboards import AddScoreCallback
-from teams.models import Team
+from teams.models import Team, Station, TeamScoreHistory
 from teams.router import send_current_station_for
 
 admin = Router()
@@ -40,6 +40,10 @@ async def cmd_start_route(message: Message, command: CommandObject):
 @admin.callback_query(AddScoreCallback.filter())
 async def add_score_callback(query: CallbackQuery, callback_data: AddScoreCallback):
     team = await Team.get(id=callback_data.team_id)
+
+    station = await Station.get(moderator=query.from_user.id)
+    await TeamScoreHistory.create(team=team, station=station, score=callback_data.score)
+
     await query.message.answer(f'Вы поставили свою оценку команде {team.name}')
 
     team.progress += 1
@@ -49,7 +53,6 @@ async def add_score_callback(query: CallbackQuery, callback_data: AddScoreCallba
 
     await query.bot.send_message(
         chat_id=team.leader,
-        text=f'Вам поставили оценку {callback_data.score}'
+        text=f'Вам поставили оценку <b>{callback_data.score}</b> на станции <b>{station.name}</b>'
     )
     await send_current_station_for(team, query.message)
-    await query.answer(str(callback_data.score))

@@ -1,6 +1,8 @@
 import asyncio
-from os import getenv
 import logging
+
+from os import getenv
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
@@ -9,12 +11,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from db import init, close_connections
 
+from teams.models import Team
 from teams.router import teams
+from teams.keyboards import DivisionCallback
 
 from admin.router import admin
-from teams.keyboards import DivisionCallback
 from settings import DIVISIONS
-from dotenv import load_dotenv
 
 
 load_dotenv()
@@ -24,6 +26,11 @@ TOKEN = getenv('BOT_TOKEN')
 
 @root.message(CommandStart())
 async def cmd_start(message: types.Message):
+    team = await Team.get_or_none(leader=message.from_user.id)
+    if team is not None:
+        return await message.answer(f'Ты уже являешься капитаном команды <b>{team.name}</b>. '
+                                    f'Для изменения названия необходимо обратиться к администратору')
+
     builder = InlineKeyboardBuilder()
     for index, division in enumerate(DIVISIONS):
         builder.button(text=division, callback_data=DivisionCallback(division_id=index))
