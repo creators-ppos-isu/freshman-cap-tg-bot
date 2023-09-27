@@ -6,6 +6,7 @@ from settings import ROUTES
 class Team(Model):
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=32)
+    division = fields.CharField(max_length=32)
     leader = fields.IntField(unique=True)
     progress = fields.IntField(default=0)
     score = fields.IntField(default=0)

@@ -7,11 +7,12 @@ from aiogram.types import (
     CallbackQuery, ErrorEvent, InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from aiogram.filters import Command, ExceptionTypeFilter
-from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import formatting
 from tortoise.exceptions import ValidationError
 
+from settings import DIVISIONS
+from .keyboards import TeamInPlaceCallback, DivisionCallback
 from .states import TeamReg
 from .models import Team, Station
 from admin.keyboards import get_add_score_kb
@@ -19,15 +20,20 @@ from admin.keyboards import get_add_score_kb
 teams = Router()
 
 
-class TeamCallback(CallbackData, prefix='next-station'):
-    pass
+@teams.callback_query(DivisionCallback.filter())
+async def process_team_division(query: CallbackQuery, callback_data: DivisionCallback, state: FSMContext):
+    await state.update_data(division=DIVISIONS[callback_data.division_id])
+    await state.set_state(TeamReg.name)
+    await query.message.answer('Придумай название для команды')
 
 
 @teams.message(TeamReg.name)
 async def process_team_name(message: Message, state: FSMContext):
+    data = await state.get_data()
     try:
         await Team.update_or_create(
             leader=message.from_user.id,
+            division=data['division'],
             defaults=dict(
                 name=message.text,
             )
@@ -37,7 +43,7 @@ async def process_team_name(message: Message, state: FSMContext):
         return await message.reply('Неверный формат названия команды: максимальная длина - 32 символа')
 
     await message.answer('Спасибо, я запомнил!')
-    logging.info(f'Registered new team with name {message.text}, leader id: {message.from_user.id}')
+    logging.info(f'Registered new team from {data["division"]} with name {message.text}, leader id: {message.from_user.id}')
     await state.clear()
 
 
@@ -52,7 +58,7 @@ async def send_current_station_for(team: Team, message: Message) -> Station:
         [
             InlineKeyboardButton(
                 text='Мы на месте!',
-                callback_data=TeamCallback().pack())
+                callback_data=TeamInPlaceCallback().pack())
         ]
     ])
     await message.bot.send_message(
@@ -64,7 +70,7 @@ async def send_current_station_for(team: Team, message: Message) -> Station:
     return station
 
 
-@teams.callback_query(TeamCallback.filter())
+@teams.callback_query(TeamInPlaceCallback.filter())
 async def team_in_place(query: CallbackQuery):
     team = await Team.get(leader=query.from_user.id)
     station = await team.get_current_station()
