@@ -32,7 +32,7 @@ async def get_all_teams(request):
 async def get_team_score_history(request):
     team_id = int(request.match_info['id'])
     team = await Team.get(id=team_id)
-    history = await TeamScoreHistory.filter(team=team).values('station__id', 'station__name', 'score')
+    history = await TeamScoreHistory.filter(team=team).values('station__id', 'station__name', 'station__club', 'score')
 
     return web.json_response({
         'team': {

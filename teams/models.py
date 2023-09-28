@@ -22,6 +22,7 @@ class Team(Model):
 class Station(Model):
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=64)
+    club = fields.CharField(max_length=64)
     place = fields.CharField(max_length=64)
     image = fields.CharField(max_length=256, null=True)
     moderator = fields.IntField()
