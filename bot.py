@@ -45,8 +45,16 @@ dp.include_routers(root, teams, admin)
 
 async def main() -> None:
     bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
+
     try:
         await init()
+        await bot.set_my_commands(
+            commands=[
+                types.BotCommand(command='start', description='Начать диалог'),
+                types.BotCommand(command='team', description='Информация о команде')
+            ],
+            scope=types.BotCommandScopeDefault()
+        )
         await dp.start_polling(bot)
     finally:
         await close_connections()

@@ -21,9 +21,24 @@ from admin.keyboards import get_add_score_kb
 teams = Router()
 
 
+@teams.message(Command('team'))
+async def cmd_team(message: Message):
+    team = await Team.get(leader=message.from_user.id)
+
+    content = formatting.as_list(
+        formatting.Bold('Информация о команде\n'),
+        formatting.as_key_value('Название', team.name),
+        formatting.as_key_value('Баллы', team.score),
+        formatting.as_key_value('Прогресс', f'{team.progress}/{10}')
+    )
+    await message.answer(**content.as_kwargs())
+
+
 @teams.callback_query(DivisionCallback.filter())
 async def process_team_division(query: CallbackQuery, callback_data: DivisionCallback, state: FSMContext):
-    await state.update_data(division=DIVISIONS[callback_data.division_id])
+    division = DIVISIONS[callback_data.division_id]
+    await query.message.edit_text(f'Ты выбрал: {division}')
+    await state.update_data(division=division)
     await state.set_state(TeamReg.name)
     await query.message.answer('Придумай название для команды')
 
@@ -77,6 +92,7 @@ async def send_current_station_for(team: Team, message: Message):
 
 @teams.callback_query(TeamInPlaceCallback.filter())
 async def team_in_place(query: CallbackQuery):
+    await query.message.edit_reply_markup()
     team = await Team.get(leader=query.from_user.id)
     station = await team.get_current_station()
 
@@ -88,19 +104,6 @@ async def team_in_place(query: CallbackQuery):
         )
     except Exception as e:
         logging.critical(f'Unable to send message to moderator {station.moderator}: {e}')
-
-
-@teams.message(Command('team'))
-async def cmd_team(message: Message):
-    team = await Team.get(leader=message.from_user.id)
-
-    content = formatting.as_list(
-        formatting.Bold('Информация о команде\n'),
-        formatting.as_key_value('Название', team.name),
-        formatting.as_key_value('Баллы', team.score),
-        formatting.as_key_value('Прогресс', f'{team.progress}/{10}')
-    )
-    await message.answer(**content.as_kwargs())
 
 
 @teams.error(ExceptionTypeFilter(tortoise.exceptions.DoesNotExist), F.update.message.as_('message'))

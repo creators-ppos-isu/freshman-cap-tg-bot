@@ -112,6 +112,7 @@ async def add_score_callback(query: CallbackQuery, callback_data: AddScoreCallba
         text=f'Вам поставили оценку <b>{callback_data.score}</b> на станции <b>{station.name}</b>'
     )
     await send_current_station_for(team, query.message)
+    await query.message.edit_reply_markup()
 
 
 @admin.message(Command('mailing'))
