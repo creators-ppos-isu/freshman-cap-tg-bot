@@ -2,15 +2,7 @@ from tortoise import Tortoise
 from teams.models import Station
 
 
-async def init():
-    await Tortoise.init(
-        db_url='sqlite://db.sqlite3',
-        modules={
-            'teams': ['teams.models']
-        }
-    )
-    await Tortoise.generate_schemas()
-
+async def create_stations():
     stations = (
         (1, 'Главный корпус', 596546865, 'Карла-Маркса, 1'),
         (2, 'ИМИТ (Актовый зал)', 0, 'Бульвар Гагарина, 20'),
@@ -32,6 +24,20 @@ async def init():
             moderator=moderator,
             place=place,
         )
+
+
+async def init():
+    await Tortoise.init(
+        db_url='sqlite://db.sqlite3',
+        modules={
+            'teams': ['teams.models']
+        }
+    )
+    await Tortoise.generate_schemas()
+
+    stations_created = await Station.all().count() > 0
+    if not stations_created:
+        await create_stations()
 
 
 async def close_connections():
