@@ -35,15 +35,13 @@ async def process_team_name(message: Message, state: FSMContext):
         team = await Team.create(
             leader=message.from_user.id,
             division=data['division'],
-            defaults=dict(
-                name=message.text,
-            )
+            name=message.text,
         )
 
-    except ValidationError:
+    except ValidationError as e:
         return await message.reply('Неверный формат названия команды: максимальная длина - 32 символа')
 
-    await message.answer('Спасибо, я запомнил!')
+    await message.reply(f'Команда {team.name} успешно зарегистрирована!')
     logging.info(f'Registered {team}')
     await state.clear()
 
@@ -82,11 +80,14 @@ async def team_in_place(query: CallbackQuery):
     team = await Team.get(leader=query.from_user.id)
     station = await team.get_current_station()
 
-    await query.bot.send_message(
-        chat_id=station.moderator,
-        text=f'Поставьте оценку команде {team.name}',
-        reply_markup=get_add_score_kb(team.id)
-    )
+    try:
+        await query.bot.send_message(
+            chat_id=station.moderator,
+            text=f'Поставьте оценку команде {team.name}',
+            reply_markup=get_add_score_kb(team.id)
+        )
+    except Exception as e:
+        logging.critical(f'Unable to send message to moderator {station.moderator}: {e}')
 
 
 @teams.message(Command('team'))

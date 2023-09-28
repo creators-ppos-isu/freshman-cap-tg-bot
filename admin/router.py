@@ -1,8 +1,10 @@
 import logging
+import asyncio
 from typing import Dict, Any, Callable, Awaitable
 
 import tortoise.exceptions
 from aiogram import Router, F
+from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     Message,
     CallbackQuery, Update, ErrorEvent
@@ -11,6 +13,8 @@ from aiogram.utils.formatting import as_list, as_key_value
 from aiogram.filters import Command, CommandObject, ExceptionTypeFilter
 
 from .keyboards import AddScoreCallback
+from .states import CreatingPost
+
 from teams.models import Team, Station, TeamScoreHistory
 from teams.router import send_current_station_for
 
@@ -37,10 +41,8 @@ async def handle_access_denied(event: ErrorEvent, message: Message):
     await message.answer('У Вас недостаточно прав для доступа к этим функциям')
 
 
-@admin.message(Command('teams'))
-async def cmd_team(message: Message):
-    teams = await Team.all()
-    content = as_list(*[
+def format_teams(teams):
+    return as_list(*[
         as_list(
             as_key_value('ID', team.id),
             as_key_value('Подразделение', team.division),
@@ -48,6 +50,19 @@ async def cmd_team(message: Message):
             as_key_value('Баллы', team.score),
             as_key_value('Пройдено станций', team.progress),
         ) for team in teams], sep='\n\n')
+
+
+@admin.message(Command('teams'))
+async def cmd_team(message: Message):
+    teams = await Team.all()
+    content = format_teams(teams)
+    await message.answer(**content.as_kwargs())
+
+
+@admin.message(Command('rating'))
+async def cmd_rating(message: Message):
+    teams = await Team.all().order_by('-score')
+    content = format_teams(teams)
     await message.answer(**content.as_kwargs())
 
 
@@ -97,3 +112,29 @@ async def add_score_callback(query: CallbackQuery, callback_data: AddScoreCallba
         text=f'Вам поставили оценку <b>{callback_data.score}</b> на станции <b>{station.name}</b>'
     )
     await send_current_station_for(team, query.message)
+
+
+@admin.message(Command('mailing'))
+async def cmd_mailing(message: Message, state: FSMContext):
+    """Рассылка"""
+    await state.set_state(CreatingPost.write_content)
+    await message.answer('Введите текст для рассылки пользователям')
+
+
+@admin.message(CreatingPost.write_content)
+async def process_post_content(message: Message, state: FSMContext):
+    leaders = await Team.all().values_list('leader')
+    leaders = tuple(zip(*leaders))[0]  # get first column of matrix
+
+    await message.reply('Начинаю рассылку...')
+
+    for leader in leaders:
+        try:
+            await message.copy_to(leader)
+        except Exception as e:
+            await message.answer(f'Не удалось отправить сообщение пользователю {leader}: {e}')
+        finally:
+            await asyncio.sleep(1)
+
+    await message.answer('Рассылка успешно завершена')
+    await state.clear()
