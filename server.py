@@ -8,9 +8,10 @@ routes = web.RouteTableDef()
 
 @routes.get('/teams')
 async def get_all_teams(request):
-    teams = await Team.all()
+    teams = await Team.filter(id__in=list(range(1, 18)))
     response = []
     for team in teams:
+        history = await TeamScoreHistory.filter(team=team).values('station__id', 'station__name', 'station__club', 'score')
         current_station = await team.get_current_station()
         response.append({
             'id': team.id,
@@ -18,11 +19,12 @@ async def get_all_teams(request):
             'name': team.name,
             'score': team.score,
             'progress': team.progress,
-            'station': {
+            'current_station': {
                 'id': current_station.id,
                 'name': current_station.name,
                 'place': current_station.place
-            }
+            },
+            'history': history
         })
 
     return web.json_response(response)
