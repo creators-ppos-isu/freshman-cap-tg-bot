@@ -10,7 +10,7 @@ class AddScoreCallback(CallbackData, prefix='add-score'):
 def get_add_score_kb(team_id: int):
     builder = InlineKeyboardBuilder()
 
-    for score in range(1, 6):
+    for score in range(1, 11):
         builder.button(
             text=str(score),
             callback_data=AddScoreCallback(score=score, team_id=team_id)
