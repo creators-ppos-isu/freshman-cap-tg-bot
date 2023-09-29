@@ -30,6 +30,22 @@ async def get_all_teams(request):
     return web.json_response(response)
 
 
+@routes.get('/teams/rates')
+async def get_all_teams(request):
+    teams = await Team.filter(id__in=list(range(1, 18)))
+    response = []
+    for team in teams:
+        history = await TeamScoreHistory.filter(team=team).values('station__club', 'score')
+        current_station = await team.get_current_station()
+        response.append({
+            'id': team.id,
+            'division': team.division,
+            'history': history
+        })
+
+    return web.json_response(response)
+
+
 @routes.get('/team/{id}/history')
 async def get_team_score_history(request):
     team_id = int(request.match_info['id'])
